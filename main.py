@@ -30,14 +30,6 @@ def validar_data(data_str):
         return False, "Formato inválido. Usa AAAA-MM-DD (ex: 2024-01-15)."
 
 
-def download_file(url, filename):
-    response = requests.get(url, timeout=20)
-    response.raise_for_status()
-
-    with open(filename, "wb") as file:
-        file.write(response.content)
-
-
 def save_text_file(filename, title, date, explanation, media_type, media_url, copyright_text):
     with open(filename, "w", encoding="utf-8") as file:
         file.write(f"Título: {title}\n")
@@ -91,7 +83,6 @@ class DatePickerWindow(ctk.CTkToplevel):
         self.title("Escolher data")
         self.geometry("440x280")
         self.resizable(False, False)
-
         self.grab_set()
 
         self.label = ctk.CTkLabel(
@@ -163,152 +154,163 @@ class NasaPremiumApp(ctk.CTk):
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        self.sidebar = ctk.CTkFrame(self, width=300, corner_radius=0, fg_color="#0E1118")
+        # SIDEBAR
+        self.sidebar = ctk.CTkFrame(self, width=280, corner_radius=0, fg_color="#0E1118")
         self.sidebar.grid(row=0, column=0, sticky="nsew")
-        self.sidebar.grid_rowconfigure(10, weight=1)
+        self.sidebar.grid_rowconfigure(5, weight=1)
+
+        # TOPO / LOGO
+        self.logo_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        self.logo_frame.grid(row=0, column=0, sticky="ew", padx=20, pady=(24, 18))
 
         self.logo_label = ctk.CTkLabel(
-            self.sidebar,
+            self.logo_frame,
             text="🚀 NASA APOD",
             font=ctk.CTkFont(size=26, weight="bold")
         )
-        self.logo_label.grid(row=0, column=0, padx=24, pady=(28, 8), sticky="w")
+        self.logo_label.pack(anchor="w")
 
         self.logo_subtitle = ctk.CTkLabel(
-            self.sidebar,
-            text="Visualizador premium\nde imagens astronómicas",
+            self.logo_frame,
+            text="Visualizador premium de imagens astronómicas",
             justify="left",
+            wraplength=220,
             text_color="#8F98AA",
             font=ctk.CTkFont(size=13)
         )
-        self.logo_subtitle.grid(row=1, column=0, padx=24, pady=(0, 24), sticky="w")
+        self.logo_subtitle.pack(anchor="w", pady=(6, 0))
 
-        self.sidebar_section = ctk.CTkLabel(
+        # AÇÕES PRINCIPAIS
+        self.primary_actions_label = ctk.CTkLabel(
             self.sidebar,
-            text="Ações",
+            text="Ações principais",
             text_color="#6F7A90",
             font=ctk.CTkFont(size=12, weight="bold")
         )
-        self.sidebar_section.grid(row=2, column=0, padx=24, pady=(0, 12), sticky="w")
+        self.primary_actions_label.grid(row=1, column=0, padx=20, pady=(0, 8), sticky="w")
+
+        self.primary_actions_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        self.primary_actions_frame.grid(row=2, column=0, sticky="ew", padx=20)
 
         self.today_btn = ctk.CTkButton(
-            self.sidebar,
+            self.primary_actions_frame,
             text="Hoje",
-            height=46,
-            corner_radius=16,
+            height=44,
+            corner_radius=14,
             command=self.load_today,
             anchor="w"
         )
-        self.today_btn.grid(row=3, column=0, padx=20, pady=6, sticky="ew")
+        self.today_btn.pack(fill="x", pady=5)
 
         self.load_date_btn = ctk.CTkButton(
-            self.sidebar,
+            self.primary_actions_frame,
             text="Escolher data",
-            height=46,
-            corner_radius=16,
+            height=44,
+            corner_radius=14,
             command=self.open_date_picker,
             anchor="w"
         )
-        self.load_date_btn.grid(row=4, column=0, padx=20, pady=6, sticky="ew")
+        self.load_date_btn.pack(fill="x", pady=5)
+
+        # AÇÕES SECUNDÁRIAS
+        self.secondary_actions_label = ctk.CTkLabel(
+            self.sidebar,
+            text="Outras ações",
+            text_color="#6F7A90",
+            font=ctk.CTkFont(size=12, weight="bold")
+        )
+        self.secondary_actions_label.grid(row=3, column=0, padx=20, pady=(16, 8), sticky="w")
+
+        self.secondary_actions_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        self.secondary_actions_frame.grid(row=4, column=0, sticky="new", padx=20)
 
         self.video_btn = ctk.CTkButton(
-            self.sidebar,
+            self.secondary_actions_frame,
             text="Abrir vídeo",
-            height=46,
-            corner_radius=16,
+            height=40,
+            corner_radius=14,
             fg_color="#252B38",
             hover_color="#31384A",
             command=self.open_media_in_browser,
             anchor="w"
         )
-        self.video_btn.grid(row=5, column=0, padx=20, pady=6, sticky="ew")
+        self.video_btn.pack(fill="x", pady=4)
 
         self.favorite_btn = ctk.CTkButton(
-            self.sidebar,
+            self.secondary_actions_frame,
             text="Adicionar favorito",
-            height=46,
-            corner_radius=16,
+            height=40,
+            corner_radius=14,
             fg_color="#D4A017",
             hover_color="#E0B84B",
             text_color="black",
             command=self.add_to_favorites,
             anchor="w"
         )
-        self.favorite_btn.grid(row=6, column=0, padx=20, pady=6, sticky="ew")
+        self.favorite_btn.pack(fill="x", pady=4)
 
         self.remove_favorite_btn = ctk.CTkButton(
-            self.sidebar,
+            self.secondary_actions_frame,
             text="Remover favorito",
-            height=46,
-            corner_radius=16,
+            height=40,
+            corner_radius=14,
             fg_color="#6B2435",
             hover_color="#853044",
             command=self.remove_current_favorite,
             anchor="w"
         )
-        self.remove_favorite_btn.grid(row=7, column=0, padx=20, pady=6, sticky="ew")
+        self.remove_favorite_btn.pack(fill="x", pady=4)
 
         self.save_btn = ctk.CTkButton(
-            self.sidebar,
+            self.secondary_actions_frame,
             text="Guardar ficheiros",
-            height=46,
-            corner_radius=16,
+            height=40,
+            corner_radius=14,
             fg_color="#252B38",
             hover_color="#31384A",
             command=self.save_current_info_again,
             anchor="w"
         )
-        self.save_btn.grid(row=8, column=0, padx=20, pady=6, sticky="ew")
+        self.save_btn.pack(fill="x", pady=4)
+
+        # FAVORITOS
+        self.favorites_section = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        self.favorites_section.grid(row=5, column=0, sticky="nsew", padx=20, pady=(18, 12))
+        self.favorites_section.grid_rowconfigure(1, weight=1)
+        self.favorites_section.grid_columnconfigure(0, weight=1)
+
+        self.favorites_title = ctk.CTkLabel(
+            self.favorites_section,
+            text="Favoritos",
+            text_color="#6F7A90",
+            font=ctk.CTkFont(size=12, weight="bold")
+        )
+        self.favorites_title.grid(row=0, column=0, sticky="w", pady=(0, 8))
+
+        self.favorites_scroll = ctk.CTkScrollableFrame(
+            self.favorites_section,
+            corner_radius=16,
+            fg_color="#141925"
+        )
+        self.favorites_scroll.grid(row=1, column=0, sticky="nsew")
+
+        # SAIR NO FUNDO
+        self.bottom_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        self.bottom_frame.grid(row=6, column=0, sticky="ew", padx=20, pady=(0, 20))
 
         self.exit_btn = ctk.CTkButton(
-            self.sidebar,
+            self.bottom_frame,
             text="Sair",
-            height=46,
-            corner_radius=16,
+            height=44,
+            corner_radius=14,
             fg_color="#8B1E3F",
             hover_color="#A02449",
             command=self.quit,
             anchor="w"
         )
-        self.exit_btn.grid(row=9, column=0, padx=20, pady=6, sticky="ew")
+        self.exit_btn.pack(fill="x")
 
-        self.favorites_title = ctk.CTkLabel(
-            self.sidebar,
-            text="Favoritos",
-            text_color="#6F7A90",
-            font=ctk.CTkFont(size=12, weight="bold")
-        )
-        self.favorites_title.grid(row=11, column=0, padx=24, pady=(12, 8), sticky="w")
-
-        self.favorites_scroll = ctk.CTkScrollableFrame(
-            self.sidebar,
-            width=250,
-            height=180,
-            corner_radius=16,
-            fg_color="#141925"
-        )
-        self.favorites_scroll.grid(row=12, column=0, padx=20, pady=(0, 16), sticky="nsew")
-
-        self.sidebar_footer = ctk.CTkFrame(self.sidebar, fg_color="#141925", corner_radius=18)
-        self.sidebar_footer.grid(row=13, column=0, padx=20, pady=(0, 20), sticky="ew")
-
-        self.footer_title = ctk.CTkLabel(
-            self.sidebar_footer,
-            text="Dica",
-            font=ctk.CTkFont(size=14, weight="bold")
-        )
-        self.footer_title.pack(anchor="w", padx=16, pady=(14, 6))
-
-        self.footer_text = ctk.CTkLabel(
-            self.sidebar_footer,
-            text="Guarda as tuas APODs preferidas e volta a abri-las com um clique.",
-            justify="left",
-            wraplength=220,
-            text_color="#A7B0C0",
-            font=ctk.CTkFont(size=12)
-        )
-        self.footer_text.pack(anchor="w", padx=16, pady=(0, 14))
-
+        # ÁREA PRINCIPAL
         self.main_area = ctk.CTkFrame(self, corner_radius=0, fg_color="#090C12")
         self.main_area.grid(row=0, column=1, sticky="nsew")
         self.main_area.grid_columnconfigure(0, weight=1)
@@ -647,8 +649,8 @@ class NasaPremiumApp(ctk.CTk):
             date = item.get("date", "Sem data")
 
             display_text = f"{date} — {title}"
-            if len(display_text) > 38:
-                display_text = display_text[:38] + "..."
+            if len(display_text) > 34:
+                display_text = display_text[:34] + "..."
 
             btn = ctk.CTkButton(
                 self.favorites_scroll,
