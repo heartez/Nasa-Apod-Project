@@ -1,0 +1,16 @@
+# ambiente virtual
+.venv/
+
+# cache python
+__pycache__/
+*.pyc
+
+# ficheiros gerados
+downloads/
+
+# sistema
+.DS_Store
+Thumbs.db
+
+# favoritos locais (opcional)
+favorites.json

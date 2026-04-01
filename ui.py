@@ -1,0 +1,663 @@
+import os
+import webbrowser
+import requests
+import customtkinter as ctk
+from tkinter import messagebox
+from datetime import datetime
+from PIL import Image
+from io import BytesIO
+
+from api import get_apod_data
+from utils import validar_data
+from storage import (
+    save_text_file,
+    load_favorites,
+    save_favorites,
+    is_favorite_already_saved,
+)
+from config import DOWNLOADS_FOLDER
+
+ctk.set_appearance_mode("dark")
+ctk.set_default_color_theme("blue")
+
+
+class DatePickerWindow(ctk.CTkToplevel):
+    def __init__(self, parent, callback):
+        super().__init__(parent)
+
+        self.callback = callback
+        self.title("Escolher data")
+        self.geometry("440x280")
+        self.resizable(False, False)
+        self.grab_set()
+
+        self.label = ctk.CTkLabel(
+            self,
+            text="Escolhe uma data",
+            font=ctk.CTkFont(size=24, weight="bold")
+        )
+        self.label.pack(pady=(25, 15))
+
+        self.entry = ctk.CTkEntry(
+            self,
+            width=240,
+            height=45,
+            corner_radius=14,
+            font=ctk.CTkFont(size=16),
+            placeholder_text="AAAA-MM-DD"
+        )
+        self.entry.pack(pady=10)
+        self.entry.insert(0, datetime.now().strftime("%Y-%m-%d"))
+
+        self.hint = ctk.CTkLabel(
+            self,
+            text="Formato: AAAA-MM-DD",
+            text_color="#9AA3B2",
+            font=ctk.CTkFont(size=14)
+        )
+        self.hint.pack(pady=(5, 18))
+
+        self.confirm_button = ctk.CTkButton(
+            self,
+            text="Carregar",
+            width=220,
+            height=50,
+            corner_radius=18,
+            font=ctk.CTkFont(size=16, weight="bold"),
+            command=self.confirm
+        )
+        self.confirm_button.pack(pady=(5, 20))
+
+    def confirm(self):
+        chosen_date = self.entry.get().strip()
+        self.callback(chosen_date)
+        self.destroy()
+
+
+class NasaPremiumApp(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+
+        self.title("NASA APOD Premium")
+        self.geometry("1500x900")
+        self.minsize(1280, 780)
+
+        os.makedirs(DOWNLOADS_FOLDER, exist_ok=True)
+
+        self.current_media_url = None
+        self.current_media_type = None
+        self.current_date = None
+        self.current_title = None
+        self.current_description = None
+        self.current_copyright = None
+        self.current_ctk_image = None
+        self.current_image_pil = None
+
+        self.build_ui()
+        self.refresh_favorites_list()
+
+    def build_ui(self):
+        self.grid_columnconfigure(1, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+
+        self.sidebar = ctk.CTkFrame(self, width=280, corner_radius=0, fg_color="#0E1118")
+        self.sidebar.grid(row=0, column=0, sticky="nsew")
+        self.sidebar.grid_rowconfigure(5, weight=1)
+
+        self.logo_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        self.logo_frame.grid(row=0, column=0, sticky="ew", padx=20, pady=(24, 18))
+
+        self.logo_label = ctk.CTkLabel(
+            self.logo_frame,
+            text="🚀 NASA APOD",
+            font=ctk.CTkFont(size=26, weight="bold")
+        )
+        self.logo_label.pack(anchor="w")
+
+        self.logo_subtitle = ctk.CTkLabel(
+            self.logo_frame,
+            text="Visualizador premium de imagens astronómicas",
+            justify="left",
+            wraplength=220,
+            text_color="#8F98AA",
+            font=ctk.CTkFont(size=13)
+        )
+        self.logo_subtitle.pack(anchor="w", pady=(6, 0))
+
+        self.primary_actions_label = ctk.CTkLabel(
+            self.sidebar,
+            text="Ações principais",
+            text_color="#6F7A90",
+            font=ctk.CTkFont(size=12, weight="bold")
+        )
+        self.primary_actions_label.grid(row=1, column=0, padx=20, pady=(0, 8), sticky="w")
+
+        self.primary_actions_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        self.primary_actions_frame.grid(row=2, column=0, sticky="ew", padx=20)
+
+        self.today_btn = ctk.CTkButton(
+            self.primary_actions_frame,
+            text="Hoje",
+            height=44,
+            corner_radius=14,
+            command=self.load_today,
+            anchor="w"
+        )
+        self.today_btn.pack(fill="x", pady=5)
+
+        self.load_date_btn = ctk.CTkButton(
+            self.primary_actions_frame,
+            text="Escolher data",
+            height=44,
+            corner_radius=14,
+            command=self.open_date_picker,
+            anchor="w"
+        )
+        self.load_date_btn.pack(fill="x", pady=5)
+
+        self.secondary_actions_label = ctk.CTkLabel(
+            self.sidebar,
+            text="Outras ações",
+            text_color="#6F7A90",
+            font=ctk.CTkFont(size=12, weight="bold")
+        )
+        self.secondary_actions_label.grid(row=3, column=0, padx=20, pady=(16, 8), sticky="w")
+
+        self.secondary_actions_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        self.secondary_actions_frame.grid(row=4, column=0, sticky="new", padx=20)
+
+        self.video_btn = ctk.CTkButton(
+            self.secondary_actions_frame,
+            text="Abrir vídeo",
+            height=40,
+            corner_radius=14,
+            fg_color="#252B38",
+            hover_color="#31384A",
+            command=self.open_media_in_browser,
+            anchor="w"
+        )
+        self.video_btn.pack(fill="x", pady=4)
+
+        self.favorite_btn = ctk.CTkButton(
+            self.secondary_actions_frame,
+            text="Adicionar favorito",
+            height=40,
+            corner_radius=14,
+            fg_color="#D4A017",
+            hover_color="#E0B84B",
+            text_color="black",
+            command=self.add_to_favorites,
+            anchor="w"
+        )
+        self.favorite_btn.pack(fill="x", pady=4)
+
+        self.remove_favorite_btn = ctk.CTkButton(
+            self.secondary_actions_frame,
+            text="Remover favorito",
+            height=40,
+            corner_radius=14,
+            fg_color="#6B2435",
+            hover_color="#853044",
+            command=self.remove_current_favorite,
+            anchor="w"
+        )
+        self.remove_favorite_btn.pack(fill="x", pady=4)
+
+        self.save_btn = ctk.CTkButton(
+            self.secondary_actions_frame,
+            text="Guardar ficheiros",
+            height=40,
+            corner_radius=14,
+            fg_color="#252B38",
+            hover_color="#31384A",
+            command=self.save_current_info_again,
+            anchor="w"
+        )
+        self.save_btn.pack(fill="x", pady=4)
+
+        self.favorites_section = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        self.favorites_section.grid(row=5, column=0, sticky="nsew", padx=20, pady=(18, 12))
+        self.favorites_section.grid_rowconfigure(1, weight=1)
+        self.favorites_section.grid_columnconfigure(0, weight=1)
+
+        self.favorites_title = ctk.CTkLabel(
+            self.favorites_section,
+            text="Favoritos",
+            text_color="#6F7A90",
+            font=ctk.CTkFont(size=12, weight="bold")
+        )
+        self.favorites_title.grid(row=0, column=0, sticky="w", pady=(0, 8))
+
+        self.favorites_scroll = ctk.CTkScrollableFrame(
+            self.favorites_section,
+            corner_radius=16,
+            fg_color="#141925"
+        )
+        self.favorites_scroll.grid(row=1, column=0, sticky="nsew")
+
+        self.bottom_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        self.bottom_frame.grid(row=6, column=0, sticky="ew", padx=20, pady=(0, 20))
+
+        self.exit_btn = ctk.CTkButton(
+            self.bottom_frame,
+            text="Sair",
+            height=44,
+            corner_radius=14,
+            fg_color="#8B1E3F",
+            hover_color="#A02449",
+            command=self.quit,
+            anchor="w"
+        )
+        self.exit_btn.pack(fill="x")
+
+        self.main_area = ctk.CTkFrame(self, corner_radius=0, fg_color="#090C12")
+        self.main_area.grid(row=0, column=1, sticky="nsew")
+        self.main_area.grid_columnconfigure(0, weight=1)
+        self.main_area.grid_rowconfigure(2, weight=1)
+
+        self.topbar = ctk.CTkFrame(self.main_area, height=90, corner_radius=0, fg_color="#090C12")
+        self.topbar.grid(row=0, column=0, sticky="ew", padx=24, pady=(18, 10))
+
+        self.page_title = ctk.CTkLabel(
+            self.topbar,
+            text="Astronomy Picture of the Day",
+            font=ctk.CTkFont(size=30, weight="bold")
+        )
+        self.page_title.grid(row=0, column=0, padx=(0, 20), pady=(8, 2), sticky="w")
+
+        self.page_subtitle = ctk.CTkLabel(
+            self.topbar,
+            text="Explora imagens e descrições da NASA numa interface moderna.",
+            text_color="#95A0B5",
+            font=ctk.CTkFont(size=14)
+        )
+        self.page_subtitle.grid(row=1, column=0, sticky="w")
+
+        self.info_cards = ctk.CTkFrame(self.main_area, fg_color="transparent")
+        self.info_cards.grid(row=1, column=0, sticky="ew", padx=24, pady=(0, 12))
+        self.info_cards.grid_columnconfigure((0, 1, 2, 3), weight=1)
+
+        self.card_date = self.create_stat_card(self.info_cards, "Data", "—")
+        self.card_date.grid(row=0, column=0, padx=(0, 8), sticky="ew")
+
+        self.card_type = self.create_stat_card(self.info_cards, "Tipo", "—")
+        self.card_type.grid(row=0, column=1, padx=8, sticky="ew")
+
+        self.card_favorite = self.create_stat_card(self.info_cards, "Favorito", "☆ Não está nos favoritos")
+        self.card_favorite.grid(row=0, column=2, padx=8, sticky="ew")
+
+        self.card_copyright = self.create_stat_card(self.info_cards, "Copyright", "—")
+        self.card_copyright.grid(row=0, column=3, padx=(8, 0), sticky="ew")
+
+        self.content = ctk.CTkFrame(self.main_area, fg_color="transparent")
+        self.content.grid(row=2, column=0, sticky="nsew", padx=24, pady=(0, 16))
+        self.content.grid_columnconfigure(0, weight=3)
+        self.content.grid_columnconfigure(1, weight=2)
+        self.content.grid_rowconfigure(0, weight=1)
+
+        self.image_panel = ctk.CTkFrame(self.content, corner_radius=24, fg_color="#11151F")
+        self.image_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+
+        self.image_title = ctk.CTkLabel(
+            self.image_panel,
+            text="Título: —",
+            anchor="w",
+            justify="left",
+            wraplength=760,
+            font=ctk.CTkFont(size=24, weight="bold")
+        )
+        self.image_title.pack(fill="x", padx=20, pady=(20, 10))
+
+        self.image_container = ctk.CTkFrame(
+            self.image_panel,
+            corner_radius=20,
+            fg_color="#0B0F18"
+        )
+        self.image_container.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+
+        self.image_label = ctk.CTkLabel(
+            self.image_container,
+            text="Carrega o conteúdo para começar.",
+            text_color="#7F8A9E",
+            font=ctk.CTkFont(size=18)
+        )
+        self.image_label.pack(fill="both", expand=True, padx=12, pady=12)
+
+        self.desc_panel = ctk.CTkFrame(self.content, corner_radius=24, fg_color="#11151F")
+        self.desc_panel.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
+        self.desc_panel.grid_rowconfigure(1, weight=1)
+        self.desc_panel.grid_columnconfigure(0, weight=1)
+
+        self.desc_title = ctk.CTkLabel(
+            self.desc_panel,
+            text="Descrição",
+            font=ctk.CTkFont(size=20, weight="bold")
+        )
+        self.desc_title.grid(row=0, column=0, sticky="w", padx=20, pady=(20, 10))
+
+        self.description_text = ctk.CTkTextbox(
+            self.desc_panel,
+            corner_radius=18,
+            font=ctk.CTkFont(size=14),
+            wrap="word",
+            fg_color="#0B0F18"
+        )
+        self.description_text.grid(row=1, column=0, sticky="nsew", padx=20, pady=(0, 20))
+        self.description_text.insert("1.0", "A descrição aparece aqui.")
+        self.description_text.configure(state="disabled")
+
+        self.status_frame = ctk.CTkFrame(self.main_area, height=48, corner_radius=18, fg_color="#101521")
+        self.status_frame.grid(row=3, column=0, sticky="ew", padx=24, pady=(0, 18))
+
+        self.status_label = ctk.CTkLabel(
+            self.status_frame,
+            text="Pronto.",
+            text_color="#8FDCB0",
+            font=ctk.CTkFont(size=13)
+        )
+        self.status_label.pack(anchor="w", padx=16, pady=12)
+
+    def create_stat_card(self, parent, title, value):
+        card = ctk.CTkFrame(parent, corner_radius=20, fg_color="#11151F")
+
+        title_label = ctk.CTkLabel(
+            card,
+            text=title,
+            text_color="#7F8A9E",
+            font=ctk.CTkFont(size=12, weight="bold")
+        )
+        title_label.pack(anchor="w", padx=16, pady=(14, 4))
+
+        value_label = ctk.CTkLabel(
+            card,
+            text=value,
+            anchor="w",
+            justify="left",
+            wraplength=280,
+            font=ctk.CTkFont(size=15, weight="bold")
+        )
+        value_label.pack(anchor="w", padx=16, pady=(0, 14))
+
+        card.value_label = value_label
+        return card
+
+    def set_status(self, text):
+        self.status_label.configure(text=text)
+
+    def set_description(self, text):
+        self.description_text.configure(state="normal")
+        self.description_text.delete("1.0", "end")
+        self.description_text.insert("1.0", text)
+        self.description_text.configure(state="disabled")
+
+    def clear_image(self, message):
+        self.image_label.configure(image=None, text=message)
+        self.current_ctk_image = None
+        self.current_image_pil = None
+
+    def show_image_from_memory(self):
+        if self.current_image_pil is None:
+            self.clear_image("Sem imagem para mostrar.")
+            return
+
+        image = self.current_image_pil.copy()
+        image.thumbnail((820, 520))
+
+        self.current_ctk_image = ctk.CTkImage(
+            light_image=image,
+            dark_image=image,
+            size=image.size
+        )
+        self.image_label.configure(image=self.current_ctk_image, text="")
+
+    def update_favorite_status(self):
+        if not self.current_date:
+            self.card_favorite.value_label.configure(text="☆ Não está nos favoritos")
+            return
+
+        favorites = load_favorites()
+
+        if is_favorite_already_saved(favorites, self.current_date):
+            self.card_favorite.value_label.configure(text="⭐ Nos favoritos")
+        else:
+            self.card_favorite.value_label.configure(text="☆ Não está nos favoritos")
+
+    def update_ui_with_data(self, data):
+        title = data["title"]
+        date = data["date"]
+        explanation = data["explanation"]
+        media_type = data["media_type"]
+        media_url = data["url"]
+        copyright_text = data.get("copyright", "Não disponível")
+
+        self.current_media_url = media_url
+        self.current_media_type = media_type
+        self.current_date = date
+        self.current_title = title
+        self.current_description = explanation
+        self.current_copyright = copyright_text
+        self.current_image_pil = None
+
+        self.image_title.configure(text=f"Título: {title}")
+        self.card_date.value_label.configure(text=date)
+        self.card_type.value_label.configure(text=media_type)
+        self.card_copyright.value_label.configure(text=copyright_text)
+        self.update_favorite_status()
+        self.set_description(explanation)
+
+        if media_type == "image":
+            response = requests.get(media_url, timeout=20)
+            response.raise_for_status()
+
+            self.current_image_pil = Image.open(BytesIO(response.content))
+            self.show_image_from_memory()
+            self.set_status("Conteúdo carregado. Podes guardar ou adicionar aos favoritos.")
+        else:
+            self.clear_image("Este conteúdo é um vídeo. Usa “Abrir vídeo”.")
+            self.set_status("Vídeo carregado. Podes guardar ou adicionar aos favoritos.")
+
+    def load_today(self):
+        try:
+            self.set_status("A carregar conteúdo de hoje...")
+            self.update_idletasks()
+
+            data = get_apod_data()
+            self.update_ui_with_data(data)
+
+        except requests.exceptions.HTTPError as error:
+            messagebox.showerror("Erro HTTP", str(error))
+            self.set_status("Falha ao carregar os dados.")
+        except requests.exceptions.RequestException as error:
+            messagebox.showerror("Erro de ligação", str(error))
+            self.set_status("Erro de rede.")
+        except KeyError as error:
+            messagebox.showerror("Erro nos dados", f"Campo em falta: {error}")
+            self.set_status("Resposta incompleta da API.")
+        except Exception as error:
+            messagebox.showerror("Erro", str(error))
+            self.set_status("Ocorreu um erro inesperado.")
+
+    def open_date_picker(self):
+        DatePickerWindow(self, self.load_selected_date_from_picker)
+
+    def load_selected_date_from_picker(self, chosen_date):
+        valid, message = validar_data(chosen_date)
+        if not valid:
+            messagebox.showwarning("Data inválida", message)
+            self.set_status("Data inválida.")
+            return
+
+        try:
+            self.set_status(f"A carregar conteúdo para {chosen_date}...")
+            self.update_idletasks()
+
+            data = get_apod_data(chosen_date)
+            self.update_ui_with_data(data)
+
+        except requests.exceptions.HTTPError as error:
+            messagebox.showerror("Erro HTTP", f"{error}\nVerifica se a data existe e está correta.")
+            self.set_status("Falha ao carregar a data escolhida.")
+        except requests.exceptions.RequestException as error:
+            messagebox.showerror("Erro de ligação", str(error))
+            self.set_status("Erro de rede.")
+        except KeyError as error:
+            messagebox.showerror("Erro nos dados", f"Campo em falta: {error}")
+            self.set_status("Resposta incompleta da API.")
+        except Exception as error:
+            messagebox.showerror("Erro", str(error))
+            self.set_status("Ocorreu um erro inesperado.")
+
+    def open_media_in_browser(self):
+        if not self.current_media_url:
+            messagebox.showinfo("Sem conteúdo", "Ainda não carregaste nenhum conteúdo.")
+            return
+
+        webbrowser.open(self.current_media_url)
+        self.set_status("Conteúdo aberto no navegador.")
+
+    def add_to_favorites(self):
+        if not self.current_date:
+            messagebox.showinfo("Sem conteúdo", "Ainda não carregaste nenhum conteúdo.")
+            return
+
+        favorites = load_favorites()
+
+        if is_favorite_already_saved(favorites, self.current_date):
+            messagebox.showinfo("Favoritos", "Este conteúdo já está nos favoritos.")
+            self.set_status("Este conteúdo já estava nos favoritos.")
+            self.update_favorite_status()
+            return
+
+        favorite_item = {
+            "title": self.current_title,
+            "date": self.current_date,
+            "media_type": self.current_media_type,
+            "media_url": self.current_media_url,
+            "copyright": self.current_copyright,
+            "description": self.current_description
+        }
+
+        favorites.append(favorite_item)
+        save_favorites(favorites)
+        self.refresh_favorites_list()
+        self.update_favorite_status()
+
+        messagebox.showinfo("Favoritos", "Conteúdo adicionado aos favoritos.")
+        self.set_status("Conteúdo adicionado aos favoritos com sucesso.")
+
+    def remove_current_favorite(self):
+        if not self.current_date:
+            messagebox.showinfo("Sem conteúdo", "Ainda não carregaste nenhum conteúdo.")
+            return
+
+        favorites = load_favorites()
+        new_favorites = [item for item in favorites if item.get("date") != self.current_date]
+
+        if len(new_favorites) == len(favorites):
+            messagebox.showinfo("Favoritos", "Este conteúdo não está nos favoritos.")
+            self.set_status("Este conteúdo não estava nos favoritos.")
+            self.update_favorite_status()
+            return
+
+        save_favorites(new_favorites)
+        self.refresh_favorites_list()
+        self.update_favorite_status()
+
+        messagebox.showinfo("Favoritos", "Favorito removido com sucesso.")
+        self.set_status("Favorito removido com sucesso.")
+
+    def refresh_favorites_list(self):
+        for widget in self.favorites_scroll.winfo_children():
+            widget.destroy()
+
+        favorites = load_favorites()
+
+        if not favorites:
+            empty_label = ctk.CTkLabel(
+                self.favorites_scroll,
+                text="Ainda não tens favoritos.",
+                text_color="#95A0B5"
+            )
+            empty_label.pack(anchor="w", padx=8, pady=8)
+            return
+
+        favorites = list(reversed(favorites))
+
+        for item in favorites:
+            title = item.get("title", "Sem título")
+            date = item.get("date", "Sem data")
+
+            display_text = f"{date} — {title}"
+            if len(display_text) > 34:
+                display_text = display_text[:34] + "..."
+
+            btn = ctk.CTkButton(
+                self.favorites_scroll,
+                text=display_text,
+                height=40,
+                corner_radius=14,
+                fg_color="#1A2130",
+                hover_color="#263049",
+                anchor="w",
+                command=lambda favorite=item: self.load_favorite_item(favorite)
+            )
+            btn.pack(fill="x", padx=8, pady=5)
+
+    def load_favorite_item(self, favorite):
+        try:
+            self.set_status(f"A abrir favorito {favorite.get('date', '')}...")
+            self.update_idletasks()
+
+            data = get_apod_data(favorite.get("date"))
+            self.update_ui_with_data(data)
+
+        except requests.exceptions.HTTPError as error:
+            messagebox.showerror("Erro HTTP", str(error))
+            self.set_status("Falha ao abrir o favorito.")
+        except requests.exceptions.RequestException as error:
+            messagebox.showerror("Erro de ligação", str(error))
+            self.set_status("Erro de rede.")
+        except Exception as error:
+            messagebox.showerror("Erro", str(error))
+            self.set_status("Ocorreu um erro ao abrir o favorito.")
+
+    def save_current_info_again(self):
+        if not self.current_date:
+            messagebox.showinfo("Sem conteúdo", "Ainda não carregaste nenhum conteúdo.")
+            return
+
+        text_path = os.path.join(DOWNLOADS_FOLDER, f"apod_{self.current_date}.txt")
+        save_text_file(
+            text_path,
+            self.current_title,
+            self.current_date,
+            self.current_description,
+            self.current_media_type,
+            self.current_media_url or "",
+            self.current_copyright
+        )
+
+        if self.current_media_type == "image" and self.current_media_url and self.current_image_pil is not None:
+            image_path = os.path.join(DOWNLOADS_FOLDER, f"apod_{self.current_date}.jpg")
+            self.current_image_pil.save(image_path)
+
+        messagebox.showinfo("Guardado", f"Os ficheiros foram guardados em '{DOWNLOADS_FOLDER}'.")
+        self.set_status("Conteúdo guardado com sucesso.")
+
+        text_path = os.path.join(DOWNLOADS_FOLDER, f"apod_{self.current_date}.txt")
+        save_text_file(
+            text_path,
+            self.current_title,
+            self.current_date,
+            self.current_description,
+            self.current_media_type,
+            self.current_media_url or "",
+            self.current_copyright
+        )
+
+        if self.current_media_type == "image" and self.current_media_url and self.current_image_pil is not None:
+            image_path = os.path.join(DOWNLOADS_FOLDER, f"apod_{self.current_date}.jpg")
+            self.current_image_pil.save(image_path)
+
+        messagebox.showinfo("Guardado", f"Os ficheiros foram guardados em '{DOWNLOADS_FOLDER}'.")
+        self.set_status("Conteúdo guardado com sucesso.")
