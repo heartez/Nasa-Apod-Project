@@ -57,6 +57,58 @@ def get_apod_data(chosen_date=None):
     return response.json()
 
 
+class DatePickerWindow(ctk.CTkToplevel):
+    def __init__(self, parent, callback):
+        super().__init__(parent)
+
+        self.callback = callback
+        self.title("Escolher data")
+        self.geometry("420x260")
+        self.resizable(False, False)
+
+        self.grab_set()
+
+        self.label = ctk.CTkLabel(
+            self,
+            text="Escreve uma data",
+            font=ctk.CTkFont(size=20, weight="bold")
+        )
+        self.label.pack(pady=(20, 10))
+
+        self.entry = ctk.CTkEntry(
+            self,
+            width=180,
+            height=40,
+            corner_radius=14,
+            placeholder_text="AAAA-MM-DD"
+        )
+        self.entry.pack(pady=10)
+        self.entry.insert(0, datetime.now().strftime("%Y-%m-%d"))
+
+        self.hint = ctk.CTkLabel(
+            self,
+            text="Formato: AAAA-MM-DD",
+            text_color="#9AA3B2"
+        )
+        self.hint.pack(pady=(0, 10))
+
+        self.confirm_button = ctk.CTkButton(
+            self,
+            text="Carregar",
+            width=220,
+            height=48,
+            corner_radius=16,
+            font=ctk.CTkFont(size=16, weight="bold"),
+            command=self.confirm
+        )
+        self.confirm_button.pack(pady=10)
+
+    def confirm(self):
+        chosen_date = self.entry.get().strip()
+        self.callback(chosen_date)
+        self.destroy()
+
+
 class NasaPremiumApp(ctk.CTk):
     def __init__(self):
         super().__init__()
@@ -74,6 +126,7 @@ class NasaPremiumApp(ctk.CTk):
         self.current_description = None
         self.current_copyright = None
         self.current_ctk_image = None
+        self.current_image_pil = None
 
         self.build_ui()
 
@@ -81,7 +134,6 @@ class NasaPremiumApp(ctk.CTk):
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        # SIDEBAR
         self.sidebar = ctk.CTkFrame(self, width=260, corner_radius=0, fg_color="#0E1118")
         self.sidebar.grid(row=0, column=0, sticky="nsew")
         self.sidebar.grid_rowconfigure(8, weight=1)
@@ -125,7 +177,7 @@ class NasaPremiumApp(ctk.CTk):
             text="Escolher data",
             height=46,
             corner_radius=16,
-            command=self.load_selected_date,
+            command=self.open_date_picker,
             anchor="w"
         )
         self.load_date_btn.grid(row=4, column=0, padx=20, pady=6, sticky="ew")
@@ -186,16 +238,13 @@ class NasaPremiumApp(ctk.CTk):
         )
         self.footer_text.pack(anchor="w", padx=16, pady=(0, 14))
 
-        # MAIN AREA
         self.main_area = ctk.CTkFrame(self, corner_radius=0, fg_color="#090C12")
         self.main_area.grid(row=0, column=1, sticky="nsew")
         self.main_area.grid_columnconfigure(0, weight=1)
         self.main_area.grid_rowconfigure(2, weight=1)
 
-        # TOPBAR
         self.topbar = ctk.CTkFrame(self.main_area, height=90, corner_radius=0, fg_color="#090C12")
         self.topbar.grid(row=0, column=0, sticky="ew", padx=24, pady=(18, 10))
-        self.topbar.grid_columnconfigure(3, weight=1)
 
         self.page_title = ctk.CTkLabel(
             self.topbar,
@@ -210,29 +259,8 @@ class NasaPremiumApp(ctk.CTk):
             text_color="#95A0B5",
             font=ctk.CTkFont(size=14)
         )
-        self.page_subtitle.grid(row=1, column=0, columnspan=2, sticky="w")
+        self.page_subtitle.grid(row=1, column=0, sticky="w")
 
-        self.date_entry = ctk.CTkEntry(
-            self.topbar,
-            width=160,
-            height=42,
-            corner_radius=16,
-            placeholder_text="AAAA-MM-DD"
-        )
-        self.date_entry.grid(row=0, column=2, rowspan=2, padx=(10, 10), sticky="e")
-        self.date_entry.insert(0, datetime.now().strftime("%Y-%m-%d"))
-
-        self.quick_load_btn = ctk.CTkButton(
-            self.topbar,
-            text="Carregar",
-            width=120,
-            height=42,
-            corner_radius=16,
-            command=self.load_selected_date
-        )
-        self.quick_load_btn.grid(row=0, column=3, rowspan=2, sticky="e")
-
-        # INFO CARDS
         self.info_cards = ctk.CTkFrame(self.main_area, fg_color="transparent")
         self.info_cards.grid(row=1, column=0, sticky="ew", padx=24, pady=(0, 12))
         self.info_cards.grid_columnconfigure((0, 1, 2), weight=1)
@@ -246,14 +274,12 @@ class NasaPremiumApp(ctk.CTk):
         self.card_copyright = self.create_stat_card(self.info_cards, "Copyright", "—")
         self.card_copyright.grid(row=0, column=2, padx=(8, 0), sticky="ew")
 
-        # CONTENT GRID
         self.content = ctk.CTkFrame(self.main_area, fg_color="transparent")
         self.content.grid(row=2, column=0, sticky="nsew", padx=24, pady=(0, 16))
         self.content.grid_columnconfigure(0, weight=3)
         self.content.grid_columnconfigure(1, weight=2)
         self.content.grid_rowconfigure(0, weight=1)
 
-        # LEFT: IMAGE PANEL
         self.image_panel = ctk.CTkFrame(self.content, corner_radius=24, fg_color="#11151F")
         self.image_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
 
@@ -282,7 +308,6 @@ class NasaPremiumApp(ctk.CTk):
         )
         self.image_label.pack(fill="both", expand=True, padx=12, pady=12)
 
-        # RIGHT: DESCRIPTION PANEL
         self.desc_panel = ctk.CTkFrame(self.content, corner_radius=24, fg_color="#11151F")
         self.desc_panel.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
         self.desc_panel.grid_rowconfigure(1, weight=1)
@@ -306,7 +331,6 @@ class NasaPremiumApp(ctk.CTk):
         self.description_text.insert("1.0", "A descrição aparece aqui.")
         self.description_text.configure(state="disabled")
 
-        # STATUS
         self.status_frame = ctk.CTkFrame(self.main_area, height=48, corner_radius=18, fg_color="#101521")
         self.status_frame.grid(row=3, column=0, sticky="ew", padx=24, pady=(0, 18))
 
@@ -354,9 +378,14 @@ class NasaPremiumApp(ctk.CTk):
     def clear_image(self, message):
         self.image_label.configure(image=None, text=message)
         self.current_ctk_image = None
+        self.current_image_pil = None
 
-    def show_image(self, image_path):
-        image = Image.open(image_path)
+    def show_image_from_memory(self):
+        if self.current_image_pil is None:
+            self.clear_image("Sem imagem para mostrar.")
+            return
+
+        image = self.current_image_pil.copy()
         image.thumbnail((820, 520))
 
         self.current_ctk_image = ctk.CTkImage(
@@ -380,6 +409,7 @@ class NasaPremiumApp(ctk.CTk):
         self.current_title = title
         self.current_description = explanation
         self.current_copyright = copyright_text
+        self.current_image_pil = None
 
         self.image_title.configure(text=f"Título: {title}")
         self.card_date.value_label.configure(text=date)
@@ -387,25 +417,17 @@ class NasaPremiumApp(ctk.CTk):
         self.card_copyright.value_label.configure(text=copyright_text)
         self.set_description(explanation)
 
-        text_path = os.path.join(DOWNLOADS_FOLDER, f"apod_{date}.txt")
-        save_text_file(
-            text_path,
-            title,
-            date,
-            explanation,
-            media_type,
-            media_url,
-            copyright_text
-        )
-
         if media_type == "image":
-            image_path = os.path.join(DOWNLOADS_FOLDER, f"apod_{date}.jpg")
-            download_file(media_url, image_path)
-            self.show_image(image_path)
-            self.set_status(f"Imagem e descrição guardadas em '{DOWNLOADS_FOLDER}'.")
+            response = requests.get(media_url, timeout=20)
+            response.raise_for_status()
+
+            from io import BytesIO
+            self.current_image_pil = Image.open(BytesIO(response.content))
+            self.show_image_from_memory()
+            self.set_status("Conteúdo carregado. Clica em 'Guardar ficheiros' se quiseres guardar.")
         else:
             self.clear_image("Este conteúdo é um vídeo. Usa “Abrir vídeo”.")
-            self.set_status(f"Vídeo carregado. Descrição guardada em '{DOWNLOADS_FOLDER}'.")
+            self.set_status("Vídeo carregado. Clica em 'Guardar ficheiros' se quiseres guardar a descrição.")
 
     def load_today(self):
         try:
@@ -428,9 +450,10 @@ class NasaPremiumApp(ctk.CTk):
             messagebox.showerror("Erro", str(error))
             self.set_status("Ocorreu um erro inesperado.")
 
-    def load_selected_date(self):
-        chosen_date = self.date_entry.get().strip()
+    def open_date_picker(self):
+        DatePickerWindow(self, self.load_selected_date_from_picker)
 
+    def load_selected_date_from_picker(self, chosen_date):
         valid, message = validar_data(chosen_date)
         if not valid:
             messagebox.showwarning("Data inválida", message)
@@ -481,13 +504,12 @@ class NasaPremiumApp(ctk.CTk):
             self.current_copyright
         )
 
-        if self.current_media_type == "image" and self.current_media_url:
+        if self.current_media_type == "image" and self.current_media_url and self.current_image_pil is not None:
             image_path = os.path.join(DOWNLOADS_FOLDER, f"apod_{self.current_date}.jpg")
-            if not os.path.exists(image_path):
-                download_file(self.current_media_url, image_path)
+            self.current_image_pil.save(image_path)
 
         messagebox.showinfo("Guardado", f"Os ficheiros foram guardados em '{DOWNLOADS_FOLDER}'.")
-        self.set_status("Conteúdo guardado novamente com sucesso.")
+        self.set_status("Conteúdo guardado com sucesso.")
 
 
 if __name__ == "__main__":
