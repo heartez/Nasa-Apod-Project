@@ -334,7 +334,7 @@ class NasaPremiumApp(ctk.CTk):
 
         self.info_cards = ctk.CTkFrame(self.main_area, fg_color="transparent")
         self.info_cards.grid(row=1, column=0, sticky="ew", padx=24, pady=(0, 12))
-        self.info_cards.grid_columnconfigure((0, 1, 2), weight=1)
+        self.info_cards.grid_columnconfigure((0, 1, 2, 3), weight=1)
 
         self.card_date = self.create_stat_card(self.info_cards, "Data", "—")
         self.card_date.grid(row=0, column=0, padx=(0, 8), sticky="ew")
@@ -342,8 +342,11 @@ class NasaPremiumApp(ctk.CTk):
         self.card_type = self.create_stat_card(self.info_cards, "Tipo", "—")
         self.card_type.grid(row=0, column=1, padx=8, sticky="ew")
 
+        self.card_favorite = self.create_stat_card(self.info_cards, "Favorito", "☆ Não está nos favoritos")
+        self.card_favorite.grid(row=0, column=2, padx=8, sticky="ew")
+
         self.card_copyright = self.create_stat_card(self.info_cards, "Copyright", "—")
-        self.card_copyright.grid(row=0, column=2, padx=(8, 0), sticky="ew")
+        self.card_copyright.grid(row=0, column=3, padx=(8, 0), sticky="ew")
 
         self.content = ctk.CTkFrame(self.main_area, fg_color="transparent")
         self.content.grid(row=2, column=0, sticky="nsew", padx=24, pady=(0, 16))
@@ -466,6 +469,18 @@ class NasaPremiumApp(ctk.CTk):
         )
         self.image_label.configure(image=self.current_ctk_image, text="")
 
+    def update_favorite_status(self):
+        if not self.current_date:
+            self.card_favorite.value_label.configure(text="☆ Não está nos favoritos")
+            return
+
+        favorites = load_favorites()
+
+        if is_favorite_already_saved(favorites, self.current_date):
+            self.card_favorite.value_label.configure(text="⭐ Nos favoritos")
+        else:
+            self.card_favorite.value_label.configure(text="☆ Não está nos favoritos")
+
     def update_ui_with_data(self, data):
         title = data["title"]
         date = data["date"]
@@ -486,6 +501,7 @@ class NasaPremiumApp(ctk.CTk):
         self.card_date.value_label.configure(text=date)
         self.card_type.value_label.configure(text=media_type)
         self.card_copyright.value_label.configure(text=copyright_text)
+        self.update_favorite_status()
         self.set_description(explanation)
 
         if media_type == "image":
@@ -568,6 +584,7 @@ class NasaPremiumApp(ctk.CTk):
         if is_favorite_already_saved(favorites, self.current_date):
             messagebox.showinfo("Favoritos", "Este conteúdo já está nos favoritos.")
             self.set_status("Este conteúdo já estava nos favoritos.")
+            self.update_favorite_status()
             return
 
         favorite_item = {
@@ -582,6 +599,7 @@ class NasaPremiumApp(ctk.CTk):
         favorites.append(favorite_item)
         save_favorites(favorites)
         self.refresh_favorites_list()
+        self.update_favorite_status()
 
         messagebox.showinfo("Favoritos", "Conteúdo adicionado aos favoritos.")
         self.set_status("Conteúdo adicionado aos favoritos com sucesso.")
@@ -597,10 +615,12 @@ class NasaPremiumApp(ctk.CTk):
         if len(new_favorites) == len(favorites):
             messagebox.showinfo("Favoritos", "Este conteúdo não está nos favoritos.")
             self.set_status("Este conteúdo não estava nos favoritos.")
+            self.update_favorite_status()
             return
 
         save_favorites(new_favorites)
         self.refresh_favorites_list()
+        self.update_favorite_status()
 
         messagebox.showinfo("Favoritos", "Favorito removido com sucesso.")
         self.set_status("Favorito removido com sucesso.")
