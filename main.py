@@ -8,7 +8,7 @@ from datetime import datetime
 from PIL import Image
 from io import BytesIO
 
-API_KEY = "DEMO_KEY"
+API_KEY = "uKFRrdIfk5xjm1M0SJRFbXORK5mGwARc6ZgkQhGW"
 BASE_URL = "https://api.nasa.gov/planetary/apod"
 DOWNLOADS_FOLDER = "downloads"
 FAVORITES_FILE = "favorites.json"
@@ -142,8 +142,8 @@ class NasaPremiumApp(ctk.CTk):
         super().__init__()
 
         self.title("NASA APOD Premium")
-        self.geometry("1450x860")
-        self.minsize(1200, 760)
+        self.geometry("1500x900")
+        self.minsize(1280, 780)
 
         os.makedirs(DOWNLOADS_FOLDER, exist_ok=True)
 
@@ -157,14 +157,15 @@ class NasaPremiumApp(ctk.CTk):
         self.current_image_pil = None
 
         self.build_ui()
+        self.refresh_favorites_list()
 
     def build_ui(self):
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        self.sidebar = ctk.CTkFrame(self, width=260, corner_radius=0, fg_color="#0E1118")
+        self.sidebar = ctk.CTkFrame(self, width=300, corner_radius=0, fg_color="#0E1118")
         self.sidebar.grid(row=0, column=0, sticky="nsew")
-        self.sidebar.grid_rowconfigure(9, weight=1)
+        self.sidebar.grid_rowconfigure(10, weight=1)
 
         self.logo_label = ctk.CTkLabel(
             self.sidebar,
@@ -180,7 +181,7 @@ class NasaPremiumApp(ctk.CTk):
             text_color="#8F98AA",
             font=ctk.CTkFont(size=13)
         )
-        self.logo_subtitle.grid(row=1, column=0, padx=24, pady=(0, 28), sticky="w")
+        self.logo_subtitle.grid(row=1, column=0, padx=24, pady=(0, 24), sticky="w")
 
         self.sidebar_section = ctk.CTkLabel(
             self.sidebar,
@@ -235,6 +236,18 @@ class NasaPremiumApp(ctk.CTk):
         )
         self.favorite_btn.grid(row=6, column=0, padx=20, pady=6, sticky="ew")
 
+        self.remove_favorite_btn = ctk.CTkButton(
+            self.sidebar,
+            text="Remover favorito",
+            height=46,
+            corner_radius=16,
+            fg_color="#6B2435",
+            hover_color="#853044",
+            command=self.remove_current_favorite,
+            anchor="w"
+        )
+        self.remove_favorite_btn.grid(row=7, column=0, padx=20, pady=6, sticky="ew")
+
         self.save_btn = ctk.CTkButton(
             self.sidebar,
             text="Guardar ficheiros",
@@ -245,7 +258,7 @@ class NasaPremiumApp(ctk.CTk):
             command=self.save_current_info_again,
             anchor="w"
         )
-        self.save_btn.grid(row=7, column=0, padx=20, pady=6, sticky="ew")
+        self.save_btn.grid(row=8, column=0, padx=20, pady=6, sticky="ew")
 
         self.exit_btn = ctk.CTkButton(
             self.sidebar,
@@ -257,10 +270,27 @@ class NasaPremiumApp(ctk.CTk):
             command=self.quit,
             anchor="w"
         )
-        self.exit_btn.grid(row=8, column=0, padx=20, pady=6, sticky="ew")
+        self.exit_btn.grid(row=9, column=0, padx=20, pady=6, sticky="ew")
+
+        self.favorites_title = ctk.CTkLabel(
+            self.sidebar,
+            text="Favoritos",
+            text_color="#6F7A90",
+            font=ctk.CTkFont(size=12, weight="bold")
+        )
+        self.favorites_title.grid(row=11, column=0, padx=24, pady=(12, 8), sticky="w")
+
+        self.favorites_scroll = ctk.CTkScrollableFrame(
+            self.sidebar,
+            width=250,
+            height=180,
+            corner_radius=16,
+            fg_color="#141925"
+        )
+        self.favorites_scroll.grid(row=12, column=0, padx=20, pady=(0, 16), sticky="nsew")
 
         self.sidebar_footer = ctk.CTkFrame(self.sidebar, fg_color="#141925", corner_radius=18)
-        self.sidebar_footer.grid(row=10, column=0, padx=20, pady=20, sticky="ew")
+        self.sidebar_footer.grid(row=13, column=0, padx=20, pady=(0, 20), sticky="ew")
 
         self.footer_title = ctk.CTkLabel(
             self.sidebar_footer,
@@ -271,9 +301,9 @@ class NasaPremiumApp(ctk.CTk):
 
         self.footer_text = ctk.CTkLabel(
             self.sidebar_footer,
-            text="Usa datas antigas para explorar imagens históricas da NASA.",
+            text="Guarda as tuas APODs preferidas e volta a abri-las com um clique.",
             justify="left",
-            wraplength=190,
+            wraplength=220,
             text_color="#A7B0C0",
             font=ctk.CTkFont(size=12)
         )
@@ -296,7 +326,7 @@ class NasaPremiumApp(ctk.CTk):
 
         self.page_subtitle = ctk.CTkLabel(
             self.topbar,
-            text="Escolhe uma data e vê a imagem, vídeo e descrição da NASA numa interface moderna.",
+            text="Explora imagens e descrições da NASA numa interface moderna.",
             text_color="#95A0B5",
             font=ctk.CTkFont(size=14)
         )
@@ -464,10 +494,10 @@ class NasaPremiumApp(ctk.CTk):
 
             self.current_image_pil = Image.open(BytesIO(response.content))
             self.show_image_from_memory()
-            self.set_status("Conteúdo carregado. Clica em 'Guardar ficheiros' se quiseres guardar.")
+            self.set_status("Conteúdo carregado. Podes guardar ou adicionar aos favoritos.")
         else:
             self.clear_image("Este conteúdo é um vídeo. Usa “Abrir vídeo”.")
-            self.set_status("Vídeo carregado. Clica em 'Guardar ficheiros' se quiseres guardar a descrição.")
+            self.set_status("Vídeo carregado. Podes guardar ou adicionar aos favoritos.")
 
     def load_today(self):
         try:
@@ -551,9 +581,84 @@ class NasaPremiumApp(ctk.CTk):
 
         favorites.append(favorite_item)
         save_favorites(favorites)
+        self.refresh_favorites_list()
 
         messagebox.showinfo("Favoritos", "Conteúdo adicionado aos favoritos.")
         self.set_status("Conteúdo adicionado aos favoritos com sucesso.")
+
+    def remove_current_favorite(self):
+        if not self.current_date:
+            messagebox.showinfo("Sem conteúdo", "Ainda não carregaste nenhum conteúdo.")
+            return
+
+        favorites = load_favorites()
+        new_favorites = [item for item in favorites if item.get("date") != self.current_date]
+
+        if len(new_favorites) == len(favorites):
+            messagebox.showinfo("Favoritos", "Este conteúdo não está nos favoritos.")
+            self.set_status("Este conteúdo não estava nos favoritos.")
+            return
+
+        save_favorites(new_favorites)
+        self.refresh_favorites_list()
+
+        messagebox.showinfo("Favoritos", "Favorito removido com sucesso.")
+        self.set_status("Favorito removido com sucesso.")
+
+    def refresh_favorites_list(self):
+        for widget in self.favorites_scroll.winfo_children():
+            widget.destroy()
+
+        favorites = load_favorites()
+
+        if not favorites:
+            empty_label = ctk.CTkLabel(
+                self.favorites_scroll,
+                text="Ainda não tens favoritos.",
+                text_color="#95A0B5"
+            )
+            empty_label.pack(anchor="w", padx=8, pady=8)
+            return
+
+        favorites = list(reversed(favorites))
+
+        for item in favorites:
+            title = item.get("title", "Sem título")
+            date = item.get("date", "Sem data")
+
+            display_text = f"{date} — {title}"
+            if len(display_text) > 38:
+                display_text = display_text[:38] + "..."
+
+            btn = ctk.CTkButton(
+                self.favorites_scroll,
+                text=display_text,
+                height=40,
+                corner_radius=14,
+                fg_color="#1A2130",
+                hover_color="#263049",
+                anchor="w",
+                command=lambda favorite=item: self.load_favorite_item(favorite)
+            )
+            btn.pack(fill="x", padx=8, pady=5)
+
+    def load_favorite_item(self, favorite):
+        try:
+            self.set_status(f"A abrir favorito {favorite.get('date', '')}...")
+            self.update_idletasks()
+
+            data = get_apod_data(favorite.get("date"))
+            self.update_ui_with_data(data)
+
+        except requests.exceptions.HTTPError as error:
+            messagebox.showerror("Erro HTTP", str(error))
+            self.set_status("Falha ao abrir o favorito.")
+        except requests.exceptions.RequestException as error:
+            messagebox.showerror("Erro de ligação", str(error))
+            self.set_status("Erro de rede.")
+        except Exception as error:
+            messagebox.showerror("Erro", str(error))
+            self.set_status("Ocorreu um erro ao abrir o favorito.")
 
     def save_current_info_again(self):
         if not self.current_date:
