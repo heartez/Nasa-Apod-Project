@@ -1,14 +1,17 @@
 import os
+import json
 import webbrowser
 import requests
 import customtkinter as ctk
 from tkinter import messagebox
 from datetime import datetime
 from PIL import Image
+from io import BytesIO
 
 API_KEY = "DEMO_KEY"
 BASE_URL = "https://api.nasa.gov/planetary/apod"
 DOWNLOADS_FOLDER = "downloads"
+FAVORITES_FILE = "favorites.json"
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
@@ -57,29 +60,53 @@ def get_apod_data(chosen_date=None):
     return response.json()
 
 
+def load_favorites():
+    if not os.path.exists(FAVORITES_FILE):
+        return []
+
+    try:
+        with open(FAVORITES_FILE, "r", encoding="utf-8") as file:
+            return json.load(file)
+    except (json.JSONDecodeError, FileNotFoundError):
+        return []
+
+
+def save_favorites(favorites):
+    with open(FAVORITES_FILE, "w", encoding="utf-8") as file:
+        json.dump(favorites, file, indent=4, ensure_ascii=False)
+
+
+def is_favorite_already_saved(favorites, date):
+    for item in favorites:
+        if item.get("date") == date:
+            return True
+    return False
+
+
 class DatePickerWindow(ctk.CTkToplevel):
     def __init__(self, parent, callback):
         super().__init__(parent)
 
         self.callback = callback
         self.title("Escolher data")
-        self.geometry("420x260")
+        self.geometry("440x280")
         self.resizable(False, False)
 
         self.grab_set()
 
         self.label = ctk.CTkLabel(
             self,
-            text="Escreve uma data",
-            font=ctk.CTkFont(size=20, weight="bold")
+            text="Escolhe uma data",
+            font=ctk.CTkFont(size=24, weight="bold")
         )
-        self.label.pack(pady=(20, 10))
+        self.label.pack(pady=(25, 15))
 
         self.entry = ctk.CTkEntry(
             self,
-            width=180,
-            height=40,
+            width=240,
+            height=45,
             corner_radius=14,
+            font=ctk.CTkFont(size=16),
             placeholder_text="AAAA-MM-DD"
         )
         self.entry.pack(pady=10)
@@ -88,20 +115,21 @@ class DatePickerWindow(ctk.CTkToplevel):
         self.hint = ctk.CTkLabel(
             self,
             text="Formato: AAAA-MM-DD",
-            text_color="#9AA3B2"
+            text_color="#9AA3B2",
+            font=ctk.CTkFont(size=14)
         )
-        self.hint.pack(pady=(0, 10))
+        self.hint.pack(pady=(5, 18))
 
         self.confirm_button = ctk.CTkButton(
             self,
             text="Carregar",
             width=220,
-            height=48,
-            corner_radius=16,
+            height=50,
+            corner_radius=18,
             font=ctk.CTkFont(size=16, weight="bold"),
             command=self.confirm
         )
-        self.confirm_button.pack(pady=10)
+        self.confirm_button.pack(pady=(5, 20))
 
     def confirm(self):
         chosen_date = self.entry.get().strip()
@@ -136,7 +164,7 @@ class NasaPremiumApp(ctk.CTk):
 
         self.sidebar = ctk.CTkFrame(self, width=260, corner_radius=0, fg_color="#0E1118")
         self.sidebar.grid(row=0, column=0, sticky="nsew")
-        self.sidebar.grid_rowconfigure(8, weight=1)
+        self.sidebar.grid_rowconfigure(9, weight=1)
 
         self.logo_label = ctk.CTkLabel(
             self.sidebar,
@@ -194,6 +222,19 @@ class NasaPremiumApp(ctk.CTk):
         )
         self.video_btn.grid(row=5, column=0, padx=20, pady=6, sticky="ew")
 
+        self.favorite_btn = ctk.CTkButton(
+            self.sidebar,
+            text="Adicionar favorito",
+            height=46,
+            corner_radius=16,
+            fg_color="#D4A017",
+            hover_color="#E0B84B",
+            text_color="black",
+            command=self.add_to_favorites,
+            anchor="w"
+        )
+        self.favorite_btn.grid(row=6, column=0, padx=20, pady=6, sticky="ew")
+
         self.save_btn = ctk.CTkButton(
             self.sidebar,
             text="Guardar ficheiros",
@@ -204,7 +245,7 @@ class NasaPremiumApp(ctk.CTk):
             command=self.save_current_info_again,
             anchor="w"
         )
-        self.save_btn.grid(row=6, column=0, padx=20, pady=6, sticky="ew")
+        self.save_btn.grid(row=7, column=0, padx=20, pady=6, sticky="ew")
 
         self.exit_btn = ctk.CTkButton(
             self.sidebar,
@@ -216,10 +257,10 @@ class NasaPremiumApp(ctk.CTk):
             command=self.quit,
             anchor="w"
         )
-        self.exit_btn.grid(row=7, column=0, padx=20, pady=6, sticky="ew")
+        self.exit_btn.grid(row=8, column=0, padx=20, pady=6, sticky="ew")
 
         self.sidebar_footer = ctk.CTkFrame(self.sidebar, fg_color="#141925", corner_radius=18)
-        self.sidebar_footer.grid(row=9, column=0, padx=20, pady=20, sticky="ew")
+        self.sidebar_footer.grid(row=10, column=0, padx=20, pady=20, sticky="ew")
 
         self.footer_title = ctk.CTkLabel(
             self.sidebar_footer,
@@ -421,7 +462,6 @@ class NasaPremiumApp(ctk.CTk):
             response = requests.get(media_url, timeout=20)
             response.raise_for_status()
 
-            from io import BytesIO
             self.current_image_pil = Image.open(BytesIO(response.content))
             self.show_image_from_memory()
             self.set_status("Conteúdo carregado. Clica em 'Guardar ficheiros' se quiseres guardar.")
@@ -487,6 +527,33 @@ class NasaPremiumApp(ctk.CTk):
 
         webbrowser.open(self.current_media_url)
         self.set_status("Conteúdo aberto no navegador.")
+
+    def add_to_favorites(self):
+        if not self.current_date:
+            messagebox.showinfo("Sem conteúdo", "Ainda não carregaste nenhum conteúdo.")
+            return
+
+        favorites = load_favorites()
+
+        if is_favorite_already_saved(favorites, self.current_date):
+            messagebox.showinfo("Favoritos", "Este conteúdo já está nos favoritos.")
+            self.set_status("Este conteúdo já estava nos favoritos.")
+            return
+
+        favorite_item = {
+            "title": self.current_title,
+            "date": self.current_date,
+            "media_type": self.current_media_type,
+            "media_url": self.current_media_url,
+            "copyright": self.current_copyright,
+            "description": self.current_description
+        }
+
+        favorites.append(favorite_item)
+        save_favorites(favorites)
+
+        messagebox.showinfo("Favoritos", "Conteúdo adicionado aos favoritos.")
+        self.set_status("Conteúdo adicionado aos favoritos com sucesso.")
 
     def save_current_info_again(self):
         if not self.current_date:
