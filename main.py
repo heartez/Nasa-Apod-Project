@@ -57,13 +57,13 @@ def get_apod_data(chosen_date=None):
     return response.json()
 
 
-class NasaApp(ctk.CTk):
+class NasaPremiumApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("NASA APOD Viewer")
-        self.geometry("1280x820")
-        self.minsize(1100, 720)
+        self.title("NASA APOD Premium")
+        self.geometry("1450x860")
+        self.minsize(1200, 760)
 
         os.makedirs(DOWNLOADS_FOLDER, exist_ok=True)
 
@@ -78,209 +78,269 @@ class NasaApp(ctk.CTk):
         self.build_ui()
 
     def build_ui(self):
-        self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1)
+        self.grid_columnconfigure(1, weight=1)
+        self.grid_rowconfigure(0, weight=1)
 
-        self.header_frame = ctk.CTkFrame(self, corner_radius=20)
-        self.header_frame.grid(row=0, column=0, sticky="ew", padx=18, pady=(18, 10))
-        self.header_frame.grid_columnconfigure(0, weight=1)
+        # SIDEBAR
+        self.sidebar = ctk.CTkFrame(self, width=260, corner_radius=0, fg_color="#0E1118")
+        self.sidebar.grid(row=0, column=0, sticky="nsew")
+        self.sidebar.grid_rowconfigure(8, weight=1)
 
-        self.title_label = ctk.CTkLabel(
-            self.header_frame,
-            text="NASA Astronomy Picture of the Day",
-            font=ctk.CTkFont(size=28, weight="bold")
+        self.logo_label = ctk.CTkLabel(
+            self.sidebar,
+            text="🚀 NASA APOD",
+            font=ctk.CTkFont(size=26, weight="bold")
         )
-        self.title_label.grid(row=0, column=0, sticky="w", padx=20, pady=(18, 4))
+        self.logo_label.grid(row=0, column=0, padx=24, pady=(28, 8), sticky="w")
 
-        self.subtitle_label = ctk.CTkLabel(
-            self.header_frame,
-            text="Explora imagens astronómicas e vídeos da NASA numa interface mais moderna.",
-            font=ctk.CTkFont(size=14),
-            text_color="#AAB0C5"
+        self.logo_subtitle = ctk.CTkLabel(
+            self.sidebar,
+            text="Visualizador premium\nde imagens astronómicas",
+            justify="left",
+            text_color="#8F98AA",
+            font=ctk.CTkFont(size=13)
         )
-        self.subtitle_label.grid(row=1, column=0, sticky="w", padx=20, pady=(0, 18))
+        self.logo_subtitle.grid(row=1, column=0, padx=24, pady=(0, 28), sticky="w")
 
-        self.main_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.main_frame.grid(row=1, column=0, sticky="nsew", padx=18, pady=(0, 10))
-        self.main_frame.grid_columnconfigure(0, weight=3)
-        self.main_frame.grid_columnconfigure(1, weight=2)
-        self.main_frame.grid_rowconfigure(1, weight=1)
-
-        self.controls_card = ctk.CTkFrame(self.main_frame, corner_radius=20)
-        self.controls_card.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 12))
-        self.controls_card.grid_columnconfigure(8, weight=1)
-
-        self.date_label = ctk.CTkLabel(
-            self.controls_card,
-            text="Data",
-            font=ctk.CTkFont(size=14, weight="bold")
+        self.sidebar_section = ctk.CTkLabel(
+            self.sidebar,
+            text="Ações",
+            text_color="#6F7A90",
+            font=ctk.CTkFont(size=12, weight="bold")
         )
-        self.date_label.grid(row=0, column=0, padx=(18, 8), pady=18)
+        self.sidebar_section.grid(row=2, column=0, padx=24, pady=(0, 12), sticky="w")
 
-        self.date_entry = ctk.CTkEntry(
-            self.controls_card,
-            width=150,
-            height=40,
-            corner_radius=14,
-            placeholder_text="AAAA-MM-DD"
-        )
-        self.date_entry.grid(row=0, column=1, padx=6, pady=18)
-        self.date_entry.insert(0, datetime.now().strftime("%Y-%m-%d"))
-
-        self.hint_label = ctk.CTkLabel(
-            self.controls_card,
-            text="Formato: AAAA-MM-DD",
-            text_color="#9AA3B2"
-        )
-        self.hint_label.grid(row=0, column=2, padx=(8, 18), pady=18)
-
-        self.today_button = ctk.CTkButton(
-            self.controls_card,
+        self.today_btn = ctk.CTkButton(
+            self.sidebar,
             text="Hoje",
-            width=120,
-            height=42,
-            corner_radius=18,
-            command=self.load_today
+            height=46,
+            corner_radius=16,
+            command=self.load_today,
+            anchor="w"
         )
-        self.today_button.grid(row=0, column=3, padx=6, pady=18)
+        self.today_btn.grid(row=3, column=0, padx=20, pady=6, sticky="ew")
 
-        self.date_button = ctk.CTkButton(
-            self.controls_card,
+        self.load_date_btn = ctk.CTkButton(
+            self.sidebar,
             text="Escolher data",
-            width=140,
-            height=42,
-            corner_radius=18,
-            command=self.load_selected_date
+            height=46,
+            corner_radius=16,
+            command=self.load_selected_date,
+            anchor="w"
         )
-        self.date_button.grid(row=0, column=4, padx=6, pady=18)
+        self.load_date_btn.grid(row=4, column=0, padx=20, pady=6, sticky="ew")
 
-        self.video_button = ctk.CTkButton(
-            self.controls_card,
+        self.video_btn = ctk.CTkButton(
+            self.sidebar,
             text="Abrir vídeo",
-            width=130,
-            height=42,
-            corner_radius=18,
-            fg_color="#2E3445",
-            hover_color="#3A4156",
-            command=self.open_media_in_browser
+            height=46,
+            corner_radius=16,
+            fg_color="#252B38",
+            hover_color="#31384A",
+            command=self.open_media_in_browser,
+            anchor="w"
         )
-        self.video_button.grid(row=0, column=5, padx=6, pady=18)
+        self.video_btn.grid(row=5, column=0, padx=20, pady=6, sticky="ew")
 
-        self.save_button = ctk.CTkButton(
-            self.controls_card,
-            text="Guardar",
-            width=120,
-            height=42,
-            corner_radius=18,
-            fg_color="#2E3445",
-            hover_color="#3A4156",
-            command=self.save_current_info_again
+        self.save_btn = ctk.CTkButton(
+            self.sidebar,
+            text="Guardar ficheiros",
+            height=46,
+            corner_radius=16,
+            fg_color="#252B38",
+            hover_color="#31384A",
+            command=self.save_current_info_again,
+            anchor="w"
         )
-        self.save_button.grid(row=0, column=6, padx=6, pady=18)
+        self.save_btn.grid(row=6, column=0, padx=20, pady=6, sticky="ew")
 
-        self.exit_button = ctk.CTkButton(
-            self.controls_card,
+        self.exit_btn = ctk.CTkButton(
+            self.sidebar,
             text="Sair",
-            width=100,
-            height=42,
-            corner_radius=18,
+            height=46,
+            corner_radius=16,
             fg_color="#8B1E3F",
             hover_color="#A02449",
-            command=self.quit
+            command=self.quit,
+            anchor="w"
         )
-        self.exit_button.grid(row=0, column=7, padx=(6, 18), pady=18)
+        self.exit_btn.grid(row=7, column=0, padx=20, pady=6, sticky="ew")
 
-        self.left_panel = ctk.CTkFrame(self.main_frame, corner_radius=20)
-        self.left_panel.grid(row=1, column=0, sticky="nsew", padx=(0, 10))
-        self.left_panel.grid_rowconfigure(1, weight=1)
-        self.left_panel.grid_columnconfigure(0, weight=1)
+        self.sidebar_footer = ctk.CTkFrame(self.sidebar, fg_color="#141925", corner_radius=18)
+        self.sidebar_footer.grid(row=9, column=0, padx=20, pady=20, sticky="ew")
 
-        self.right_panel = ctk.CTkFrame(self.main_frame, corner_radius=20)
-        self.right_panel.grid(row=1, column=1, sticky="nsew", padx=(10, 0))
-        self.right_panel.grid_rowconfigure(1, weight=1)
-        self.right_panel.grid_columnconfigure(0, weight=1)
+        self.footer_title = ctk.CTkLabel(
+            self.sidebar_footer,
+            text="Dica",
+            font=ctk.CTkFont(size=14, weight="bold")
+        )
+        self.footer_title.pack(anchor="w", padx=16, pady=(14, 6))
 
-        self.info_frame = ctk.CTkFrame(self.left_panel, fg_color="transparent")
-        self.info_frame.grid(row=0, column=0, sticky="ew", padx=18, pady=(18, 10))
-
-        self.apod_title = ctk.CTkLabel(
-            self.info_frame,
-            text="Título: —",
+        self.footer_text = ctk.CTkLabel(
+            self.sidebar_footer,
+            text="Usa datas antigas para explorar imagens históricas da NASA.",
             justify="left",
+            wraplength=190,
+            text_color="#A7B0C0",
+            font=ctk.CTkFont(size=12)
+        )
+        self.footer_text.pack(anchor="w", padx=16, pady=(0, 14))
+
+        # MAIN AREA
+        self.main_area = ctk.CTkFrame(self, corner_radius=0, fg_color="#090C12")
+        self.main_area.grid(row=0, column=1, sticky="nsew")
+        self.main_area.grid_columnconfigure(0, weight=1)
+        self.main_area.grid_rowconfigure(2, weight=1)
+
+        # TOPBAR
+        self.topbar = ctk.CTkFrame(self.main_area, height=90, corner_radius=0, fg_color="#090C12")
+        self.topbar.grid(row=0, column=0, sticky="ew", padx=24, pady=(18, 10))
+        self.topbar.grid_columnconfigure(3, weight=1)
+
+        self.page_title = ctk.CTkLabel(
+            self.topbar,
+            text="Astronomy Picture of the Day",
+            font=ctk.CTkFont(size=30, weight="bold")
+        )
+        self.page_title.grid(row=0, column=0, padx=(0, 20), pady=(8, 2), sticky="w")
+
+        self.page_subtitle = ctk.CTkLabel(
+            self.topbar,
+            text="Escolhe uma data e vê a imagem, vídeo e descrição da NASA numa interface moderna.",
+            text_color="#95A0B5",
+            font=ctk.CTkFont(size=14)
+        )
+        self.page_subtitle.grid(row=1, column=0, columnspan=2, sticky="w")
+
+        self.date_entry = ctk.CTkEntry(
+            self.topbar,
+            width=160,
+            height=42,
+            corner_radius=16,
+            placeholder_text="AAAA-MM-DD"
+        )
+        self.date_entry.grid(row=0, column=2, rowspan=2, padx=(10, 10), sticky="e")
+        self.date_entry.insert(0, datetime.now().strftime("%Y-%m-%d"))
+
+        self.quick_load_btn = ctk.CTkButton(
+            self.topbar,
+            text="Carregar",
+            width=120,
+            height=42,
+            corner_radius=16,
+            command=self.load_selected_date
+        )
+        self.quick_load_btn.grid(row=0, column=3, rowspan=2, sticky="e")
+
+        # INFO CARDS
+        self.info_cards = ctk.CTkFrame(self.main_area, fg_color="transparent")
+        self.info_cards.grid(row=1, column=0, sticky="ew", padx=24, pady=(0, 12))
+        self.info_cards.grid_columnconfigure((0, 1, 2), weight=1)
+
+        self.card_date = self.create_stat_card(self.info_cards, "Data", "—")
+        self.card_date.grid(row=0, column=0, padx=(0, 8), sticky="ew")
+
+        self.card_type = self.create_stat_card(self.info_cards, "Tipo", "—")
+        self.card_type.grid(row=0, column=1, padx=8, sticky="ew")
+
+        self.card_copyright = self.create_stat_card(self.info_cards, "Copyright", "—")
+        self.card_copyright.grid(row=0, column=2, padx=(8, 0), sticky="ew")
+
+        # CONTENT GRID
+        self.content = ctk.CTkFrame(self.main_area, fg_color="transparent")
+        self.content.grid(row=2, column=0, sticky="nsew", padx=24, pady=(0, 16))
+        self.content.grid_columnconfigure(0, weight=3)
+        self.content.grid_columnconfigure(1, weight=2)
+        self.content.grid_rowconfigure(0, weight=1)
+
+        # LEFT: IMAGE PANEL
+        self.image_panel = ctk.CTkFrame(self.content, corner_radius=24, fg_color="#11151F")
+        self.image_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+
+        self.image_title = ctk.CTkLabel(
+            self.image_panel,
+            text="Título: —",
             anchor="w",
-            wraplength=700,
+            justify="left",
+            wraplength=760,
             font=ctk.CTkFont(size=24, weight="bold")
         )
-        self.apod_title.pack(anchor="w", fill="x", pady=(0, 12))
+        self.image_title.pack(fill="x", padx=20, pady=(20, 10))
 
-        self.apod_date = ctk.CTkLabel(
-            self.info_frame,
-            text="Data: —",
-            anchor="w",
-            font=ctk.CTkFont(size=14),
-            text_color="#B4BCD0"
+        self.image_container = ctk.CTkFrame(
+            self.image_panel,
+            corner_radius=20,
+            fg_color="#0B0F18"
         )
-        self.apod_date.pack(anchor="w", pady=3)
-
-        self.apod_type = ctk.CTkLabel(
-            self.info_frame,
-            text="Tipo: —",
-            anchor="w",
-            font=ctk.CTkFont(size=14),
-            text_color="#B4BCD0"
-        )
-        self.apod_type.pack(anchor="w", pady=3)
-
-        self.apod_copyright = ctk.CTkLabel(
-            self.info_frame,
-            text="Copyright: —",
-            justify="left",
-            anchor="w",
-            wraplength=700,
-            font=ctk.CTkFont(size=14),
-            text_color="#B4BCD0"
-        )
-        self.apod_copyright.pack(anchor="w", fill="x", pady=3)
-
-        self.image_frame = ctk.CTkFrame(self.left_panel, corner_radius=18, fg_color="#10131A")
-        self.image_frame.grid(row=1, column=0, sticky="nsew", padx=18, pady=(0, 18))
-        self.image_frame.grid_rowconfigure(0, weight=1)
-        self.image_frame.grid_columnconfigure(0, weight=1)
+        self.image_container.pack(fill="both", expand=True, padx=20, pady=(0, 20))
 
         self.image_label = ctk.CTkLabel(
-            self.image_frame,
-            text="Carrega em “Hoje” ou escolhe uma data.",
-            font=ctk.CTkFont(size=18),
-            text_color="#8C95A8"
+            self.image_container,
+            text="Carrega o conteúdo para começar.",
+            text_color="#7F8A9E",
+            font=ctk.CTkFont(size=18)
         )
-        self.image_label.grid(row=0, column=0, sticky="nsew", padx=12, pady=12)
+        self.image_label.pack(fill="both", expand=True, padx=12, pady=12)
+
+        # RIGHT: DESCRIPTION PANEL
+        self.desc_panel = ctk.CTkFrame(self.content, corner_radius=24, fg_color="#11151F")
+        self.desc_panel.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
+        self.desc_panel.grid_rowconfigure(1, weight=1)
+        self.desc_panel.grid_columnconfigure(0, weight=1)
 
         self.desc_title = ctk.CTkLabel(
-            self.right_panel,
+            self.desc_panel,
             text="Descrição",
             font=ctk.CTkFont(size=20, weight="bold")
         )
-        self.desc_title.grid(row=0, column=0, sticky="w", padx=18, pady=(18, 10))
+        self.desc_title.grid(row=0, column=0, sticky="w", padx=20, pady=(20, 10))
 
         self.description_text = ctk.CTkTextbox(
-            self.right_panel,
-            corner_radius=16,
+            self.desc_panel,
+            corner_radius=18,
             font=ctk.CTkFont(size=14),
-            wrap="word"
+            wrap="word",
+            fg_color="#0B0F18"
         )
-        self.description_text.grid(row=1, column=0, sticky="nsew", padx=18, pady=(0, 18))
-        self.description_text.insert("1.0", "A descrição vai aparecer aqui.")
+        self.description_text.grid(row=1, column=0, sticky="nsew", padx=20, pady=(0, 20))
+        self.description_text.insert("1.0", "A descrição aparece aqui.")
         self.description_text.configure(state="disabled")
 
+        # STATUS
+        self.status_frame = ctk.CTkFrame(self.main_area, height=48, corner_radius=18, fg_color="#101521")
+        self.status_frame.grid(row=3, column=0, sticky="ew", padx=24, pady=(0, 18))
+
         self.status_label = ctk.CTkLabel(
-            self,
+            self.status_frame,
             text="Pronto.",
-            height=32,
-            anchor="w",
-            text_color="#91D7AE",
+            text_color="#8FDCB0",
             font=ctk.CTkFont(size=13)
         )
-        self.status_label.grid(row=2, column=0, sticky="ew", padx=24, pady=(0, 12))
+        self.status_label.pack(anchor="w", padx=16, pady=12)
+
+    def create_stat_card(self, parent, title, value):
+        card = ctk.CTkFrame(parent, corner_radius=20, fg_color="#11151F")
+
+        title_label = ctk.CTkLabel(
+            card,
+            text=title,
+            text_color="#7F8A9E",
+            font=ctk.CTkFont(size=12, weight="bold")
+        )
+        title_label.pack(anchor="w", padx=16, pady=(14, 4))
+
+        value_label = ctk.CTkLabel(
+            card,
+            text=value,
+            anchor="w",
+            justify="left",
+            wraplength=280,
+            font=ctk.CTkFont(size=15, weight="bold")
+        )
+        value_label.pack(anchor="w", padx=16, pady=(0, 14))
+
+        card.value_label = value_label
+        return card
 
     def set_status(self, text):
         self.status_label.configure(text=text)
@@ -297,9 +357,13 @@ class NasaApp(ctk.CTk):
 
     def show_image(self, image_path):
         image = Image.open(image_path)
-        image.thumbnail((760, 460))
+        image.thumbnail((820, 520))
 
-        self.current_ctk_image = ctk.CTkImage(light_image=image, dark_image=image, size=image.size)
+        self.current_ctk_image = ctk.CTkImage(
+            light_image=image,
+            dark_image=image,
+            size=image.size
+        )
         self.image_label.configure(image=self.current_ctk_image, text="")
 
     def update_ui_with_data(self, data):
@@ -317,10 +381,10 @@ class NasaApp(ctk.CTk):
         self.current_description = explanation
         self.current_copyright = copyright_text
 
-        self.apod_title.configure(text=f"Título: {title}")
-        self.apod_date.configure(text=f"Data: {date}")
-        self.apod_type.configure(text=f"Tipo: {media_type}")
-        self.apod_copyright.configure(text=f"Copyright: {copyright_text}")
+        self.image_title.configure(text=f"Título: {title}")
+        self.card_date.value_label.configure(text=date)
+        self.card_type.value_label.configure(text=media_type)
+        self.card_copyright.value_label.configure(text=copyright_text)
         self.set_description(explanation)
 
         text_path = os.path.join(DOWNLOADS_FOLDER, f"apod_{date}.txt")
@@ -340,7 +404,7 @@ class NasaApp(ctk.CTk):
             self.show_image(image_path)
             self.set_status(f"Imagem e descrição guardadas em '{DOWNLOADS_FOLDER}'.")
         else:
-            self.clear_image("Este conteúdo é um vídeo. Usa o botão “Abrir vídeo”.")
+            self.clear_image("Este conteúdo é um vídeo. Usa “Abrir vídeo”.")
             self.set_status(f"Vídeo carregado. Descrição guardada em '{DOWNLOADS_FOLDER}'.")
 
     def load_today(self):
@@ -427,5 +491,5 @@ class NasaApp(ctk.CTk):
 
 
 if __name__ == "__main__":
-    app = NasaApp()
+    app = NasaPremiumApp()
     app.mainloop()
