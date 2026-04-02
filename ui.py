@@ -7,7 +7,7 @@ from datetime import datetime
 from PIL import Image
 from io import BytesIO
 
-from api import get_apod_data
+from api import get_apod_data, get_random_apod
 from utils import validar_data
 from storage import (
     save_text_file,
@@ -68,6 +68,8 @@ class DatePickerWindow(ctk.CTkToplevel):
         )
         self.confirm_button.pack(pady=(5, 20))
 
+        self.entry.bind("<Return>", lambda event: self.confirm())
+
     def confirm(self):
         chosen_date = self.entry.get().strip()
         self.callback(chosen_date)
@@ -100,6 +102,7 @@ class NasaPremiumApp(ctk.CTk):
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
+        # SIDEBAR
         self.sidebar = ctk.CTkFrame(self, width=280, corner_radius=0, fg_color="#0E1118")
         self.sidebar.grid(row=0, column=0, sticky="nsew")
         self.sidebar.grid_rowconfigure(5, weight=1)
@@ -124,6 +127,7 @@ class NasaPremiumApp(ctk.CTk):
         )
         self.logo_subtitle.pack(anchor="w", pady=(6, 0))
 
+        # AÇÕES PRINCIPAIS
         self.primary_actions_label = ctk.CTkLabel(
             self.sidebar,
             text="Ações principais",
@@ -155,6 +159,17 @@ class NasaPremiumApp(ctk.CTk):
         )
         self.load_date_btn.pack(fill="x", pady=5)
 
+        self.random_btn = ctk.CTkButton(
+            self.primary_actions_frame,
+            text="🎲 Aleatório",
+            height=44,
+            corner_radius=14,
+            command=self.load_random,
+            anchor="w"
+        )
+        self.random_btn.pack(fill="x", pady=5)
+
+        # AÇÕES SECUNDÁRIAS
         self.secondary_actions_label = ctk.CTkLabel(
             self.sidebar,
             text="Outras ações",
@@ -180,28 +195,16 @@ class NasaPremiumApp(ctk.CTk):
 
         self.favorite_btn = ctk.CTkButton(
             self.secondary_actions_frame,
-            text="Adicionar favorito",
+            text="⭐ Adicionar favorito",
             height=40,
             corner_radius=14,
             fg_color="#D4A017",
             hover_color="#E0B84B",
             text_color="black",
-            command=self.add_to_favorites,
+            command=self.toggle_favorite,
             anchor="w"
         )
         self.favorite_btn.pack(fill="x", pady=4)
-
-        self.remove_favorite_btn = ctk.CTkButton(
-            self.secondary_actions_frame,
-            text="Remover favorito",
-            height=40,
-            corner_radius=14,
-            fg_color="#6B2435",
-            hover_color="#853044",
-            command=self.remove_current_favorite,
-            anchor="w"
-        )
-        self.remove_favorite_btn.pack(fill="x", pady=4)
 
         self.save_btn = ctk.CTkButton(
             self.secondary_actions_frame,
@@ -215,6 +218,7 @@ class NasaPremiumApp(ctk.CTk):
         )
         self.save_btn.pack(fill="x", pady=4)
 
+        # FAVORITOS
         self.favorites_section = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         self.favorites_section.grid(row=5, column=0, sticky="nsew", padx=20, pady=(18, 12))
         self.favorites_section.grid_rowconfigure(1, weight=1)
@@ -235,6 +239,7 @@ class NasaPremiumApp(ctk.CTk):
         )
         self.favorites_scroll.grid(row=1, column=0, sticky="nsew")
 
+        # SAIR
         self.bottom_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         self.bottom_frame.grid(row=6, column=0, sticky="ew", padx=20, pady=(0, 20))
 
@@ -250,6 +255,7 @@ class NasaPremiumApp(ctk.CTk):
         )
         self.exit_btn.pack(fill="x")
 
+        # ÁREA PRINCIPAL
         self.main_area = ctk.CTkFrame(self, corner_radius=0, fg_color="#090C12")
         self.main_area.grid(row=0, column=1, sticky="nsew")
         self.main_area.grid_columnconfigure(0, weight=1)
@@ -319,9 +325,11 @@ class NasaPremiumApp(ctk.CTk):
             self.image_container,
             text="Carrega o conteúdo para começar.",
             text_color="#7F8A9E",
-            font=ctk.CTkFont(size=18)
+            font=ctk.CTkFont(size=18),
+            cursor="hand2"
         )
         self.image_label.pack(fill="both", expand=True, padx=12, pady=12)
+        self.image_label.bind("<Button-1>", self.open_fullscreen)
 
         self.desc_panel = ctk.CTkFrame(self.content, corner_radius=24, fg_color="#11151F")
         self.desc_panel.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
@@ -413,14 +421,17 @@ class NasaPremiumApp(ctk.CTk):
     def update_favorite_status(self):
         if not self.current_date:
             self.card_favorite.value_label.configure(text="☆ Não está nos favoritos")
+            self.favorite_btn.configure(text="⭐ Adicionar favorito")
             return
 
         favorites = load_favorites()
 
         if is_favorite_already_saved(favorites, self.current_date):
             self.card_favorite.value_label.configure(text="⭐ Nos favoritos")
+            self.favorite_btn.configure(text="❌ Remover favorito")
         else:
             self.card_favorite.value_label.configure(text="☆ Não está nos favoritos")
+            self.favorite_btn.configure(text="⭐ Adicionar favorito")
 
     def update_ui_with_data(self, data):
         title = data["title"]
@@ -451,7 +462,7 @@ class NasaPremiumApp(ctk.CTk):
 
             self.current_image_pil = Image.open(BytesIO(response.content))
             self.show_image_from_memory()
-            self.set_status("Conteúdo carregado. Podes guardar ou adicionar aos favoritos.")
+            self.set_status("Conteúdo carregado. Podes guardar, favoritar ou abrir em tamanho grande.")
         else:
             self.clear_image("Este conteúdo é um vídeo. Usa “Abrir vídeo”.")
             self.set_status("Vídeo carregado. Podes guardar ou adicionar aos favoritos.")
@@ -476,6 +487,24 @@ class NasaPremiumApp(ctk.CTk):
         except Exception as error:
             messagebox.showerror("Erro", str(error))
             self.set_status("Ocorreu um erro inesperado.")
+
+    def load_random(self):
+        try:
+            self.set_status("A carregar imagem aleatória...")
+            self.update_idletasks()
+
+            data = get_random_apod()
+            self.update_ui_with_data(data)
+
+        except requests.exceptions.HTTPError as error:
+            messagebox.showerror("Erro HTTP", str(error))
+            self.set_status("Falha ao carregar imagem aleatória.")
+        except requests.exceptions.RequestException as error:
+            messagebox.showerror("Erro de ligação", str(error))
+            self.set_status("Erro de rede.")
+        except Exception as error:
+            messagebox.showerror("Erro", str(error))
+            self.set_status("Ocorreu um erro ao carregar imagem aleatória.")
 
     def open_date_picker(self):
         DatePickerWindow(self, self.load_selected_date_from_picker)
@@ -515,7 +544,7 @@ class NasaPremiumApp(ctk.CTk):
         webbrowser.open(self.current_media_url)
         self.set_status("Conteúdo aberto no navegador.")
 
-    def add_to_favorites(self):
+    def toggle_favorite(self):
         if not self.current_date:
             messagebox.showinfo("Sem conteúdo", "Ainda não carregaste nenhum conteúdo.")
             return
@@ -523,48 +552,23 @@ class NasaPremiumApp(ctk.CTk):
         favorites = load_favorites()
 
         if is_favorite_already_saved(favorites, self.current_date):
-            messagebox.showinfo("Favoritos", "Este conteúdo já está nos favoritos.")
-            self.set_status("Este conteúdo já estava nos favoritos.")
-            self.update_favorite_status()
-            return
+            favorites = [item for item in favorites if item.get("date") != self.current_date]
+            save_favorites(favorites)
+            self.set_status("Removido dos favoritos.")
+        else:
+            favorites.append({
+                "title": self.current_title,
+                "date": self.current_date,
+                "media_type": self.current_media_type,
+                "media_url": self.current_media_url,
+                "copyright": self.current_copyright,
+                "description": self.current_description
+            })
+            save_favorites(favorites)
+            self.set_status("Adicionado aos favoritos.")
 
-        favorite_item = {
-            "title": self.current_title,
-            "date": self.current_date,
-            "media_type": self.current_media_type,
-            "media_url": self.current_media_url,
-            "copyright": self.current_copyright,
-            "description": self.current_description
-        }
-
-        favorites.append(favorite_item)
-        save_favorites(favorites)
         self.refresh_favorites_list()
         self.update_favorite_status()
-
-        messagebox.showinfo("Favoritos", "Conteúdo adicionado aos favoritos.")
-        self.set_status("Conteúdo adicionado aos favoritos com sucesso.")
-
-    def remove_current_favorite(self):
-        if not self.current_date:
-            messagebox.showinfo("Sem conteúdo", "Ainda não carregaste nenhum conteúdo.")
-            return
-
-        favorites = load_favorites()
-        new_favorites = [item for item in favorites if item.get("date") != self.current_date]
-
-        if len(new_favorites) == len(favorites):
-            messagebox.showinfo("Favoritos", "Este conteúdo não está nos favoritos.")
-            self.set_status("Este conteúdo não estava nos favoritos.")
-            self.update_favorite_status()
-            return
-
-        save_favorites(new_favorites)
-        self.refresh_favorites_list()
-        self.update_favorite_status()
-
-        messagebox.showinfo("Favoritos", "Favorito removido com sucesso.")
-        self.set_status("Favorito removido com sucesso.")
 
     def refresh_favorites_list(self):
         for widget in self.favorites_scroll.winfo_children():
@@ -621,28 +625,31 @@ class NasaPremiumApp(ctk.CTk):
             messagebox.showerror("Erro", str(error))
             self.set_status("Ocorreu um erro ao abrir o favorito.")
 
+    def open_fullscreen(self, event=None):
+        if not self.current_image_pil:
+            return
+
+        window = ctk.CTkToplevel(self)
+        window.title("Imagem em tamanho grande")
+        window.geometry("1200x900")
+
+        img = self.current_image_pil.copy()
+        img.thumbnail((1100, 820))
+
+        fullscreen_image = ctk.CTkImage(
+            light_image=img,
+            dark_image=img,
+            size=img.size
+        )
+
+        label = ctk.CTkLabel(window, image=fullscreen_image, text="")
+        label.image = fullscreen_image
+        label.pack(expand=True, fill="both", padx=20, pady=20)
+
     def save_current_info_again(self):
         if not self.current_date:
             messagebox.showinfo("Sem conteúdo", "Ainda não carregaste nenhum conteúdo.")
             return
-
-        text_path = os.path.join(DOWNLOADS_FOLDER, f"apod_{self.current_date}.txt")
-        save_text_file(
-            text_path,
-            self.current_title,
-            self.current_date,
-            self.current_description,
-            self.current_media_type,
-            self.current_media_url or "",
-            self.current_copyright
-        )
-
-        if self.current_media_type == "image" and self.current_media_url and self.current_image_pil is not None:
-            image_path = os.path.join(DOWNLOADS_FOLDER, f"apod_{self.current_date}.jpg")
-            self.current_image_pil.save(image_path)
-
-        messagebox.showinfo("Guardado", f"Os ficheiros foram guardados em '{DOWNLOADS_FOLDER}'.")
-        self.set_status("Conteúdo guardado com sucesso.")
 
         text_path = os.path.join(DOWNLOADS_FOLDER, f"apod_{self.current_date}.txt")
         save_text_file(
